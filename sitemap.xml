@@ -1,0 +1,22 @@
+<urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
+<url><loc>/404.html</loc></url>
+<url><loc>/LICENSE-text.html</loc></url>
+<url><loc>/articles/SEPA-intro.html</loc></url>
+<url><loc>/articles/index.html</loc></url>
+<url><loc>/authors.html</loc></url>
+<url><loc>/index.html</loc></url>
+<url><loc>/news/index.html</loc></url>
+<url><loc>/reference/boot_cis_all.html</loc></url>
+<url><loc>/reference/draw_sepa_biplot.html</loc></url>
+<url><loc>/reference/fake_wj.html</loc></url>
+<url><loc>/reference/index.html</loc></url>
+<url><loc>/reference/parallel_analysis_ipsatized.html</loc></url>
+<url><loc>/reference/percentile_ci_mat.html</loc></url>
+<url><loc>/reference/print.sepa_result.html</loc></url>
+<url><loc>/reference/run_sepa.html</loc></url>
+<url><loc>/reference/sepa_stats_all.html</loc></url>
+<url><loc>/reference/simulate_sepa_fake_wj.html</loc></url>
+<url><loc>/reference/write_long_to_wide.html</loc></url>
+<url><loc>/reference/write_matrix_wide.html</loc></url>
+</urlset>
+
