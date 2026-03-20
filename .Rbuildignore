@@ -1,0 +1,9 @@
+^data-raw$
+^cran-comments\.md$
+^CRAN_SUBMISSION_STEPS\.R$
+^\.github$
+^.*\.Rproj$
+^\.Rproj\.user$
+^README\.Rmd$
+^doc$
+^Meta$

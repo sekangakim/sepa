@@ -1,0 +1,320 @@
+---
+title: "Segment Profile Extraction via Pattern Analysis: A Workflow Guide"
+author: "Se-Kang Kim"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+vignette: >
+  %\VignetteIndexEntry{Segment Profile Extraction via Pattern Analysis: A Workflow Guide}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse  = TRUE,
+  comment   = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  eval      = FALSE
+)
+```
+
+> **Note.** All code chunks in this vignette are set to `eval = FALSE` to keep
+> CRAN check times within limits, as the bootstrap and permutation procedures
+> are computationally intensive. All code is fully executable in an interactive
+> R session. Precomputed results for all three pipelines are stored in
+> `inst/extdata/` and can be loaded with `readRDS(system.file("extdata",
+> "results_bin.rds", package = "SEPA"))` etc. Full output and figures are
+> reported in the accompanying manuscript
+> (Kim and Grochowalski, 2019, <doi:10.1007/s00357-018-9277-7>).
+
+---
+
+# Introduction
+
+The **SEPA** package implements the Segment Profile Extraction via Pattern
+Analysis method for row-mean-centered multivariate data. The three automated
+workflow functions are:
+
+- `alsi_workflow()` — binary data via multiple correspondence analysis (MCA)
+- `alsi_workflow_ordinal()` — ordinal Likert-type data via homals alternating
+  least squares (ALS) optimal scaling
+- `calsi_workflow()` — continuous multivariate data via ipsatized singular
+  value decomposition (SVD)
+
+All three pipelines share a common structure:
+
+1. Dimensionality assessment via parallel analysis
+2. Bootstrap Procrustes stability diagnostics using a simultaneous dual
+   criterion (principal angles and Tucker congruence coefficients)
+3. Variance-weighted aggregation of stable dimensions into a person-level index
+
+```{r load-package}
+library("SEPA")
+```
+
+---
+
+# Example 1: Binary Data
+
+This example illustrates the `alsi_workflow()` pipeline using binary diagnostic
+data from N = 1,261 individuals assessed for eating disorders.
+
+## Data
+
+```{r binary-data}
+data("ANR2", package = "SEPA")
+vars <- c("MDD", "DYS", "DEP", "PTSD", "OCD", "GAD", "ANX", "SOPH", "ADHD")
+head(ANR2[, vars])
+```
+
+Diagnostic prevalence varies substantially: MDD is the most common diagnosis
+(44.3%), followed by DEP and ANX, while DYS is the least prevalent (4.7%).
+
+## Full Workflow Call
+
+The following chunk shows the exact call used to generate the precomputed
+results stored in `inst/extdata/results_bin.rds`.
+
+```{r binary-workflow}
+results_bin <- alsi_workflow(
+  data     = ANR2,
+  vars     = vars,
+  B_pa     = 2000,
+  B_boot   = 2000,
+  seed     = 20260123
+)
+```
+
+## Load and Inspect Precomputed Results
+
+```{r binary-load}
+results_bin <- readRDS(system.file("extdata", "results_bin.rds",
+                                    package = "SEPA"))
+```
+
+## Parallel Analysis
+
+```{r binary-pa}
+print(results_bin$pa)
+```
+
+The first three observed eigenvalues exceed their permutation-based 95th-
+percentile reference values, supporting retention of a K* = 3-dimensional MCA
+subspace. These three dimensions account for approximately 48% of total inertia.
+
+## Bootstrap Stability Diagnostics
+
+```{r binary-stability}
+print(results_bin$boot)
+plot_subspace_stability(results_bin$boot)
+```
+
+Median principal angles are 2.77°, 6.94°, and 15.46° for Dimensions 1–3,
+all well below the 20° threshold. Tucker congruence coefficients range from
+phi = 0.978 to phi = 0.992. All three dimensions pass the dual criterion,
+yielding K* = 3.
+
+## ALSI Computation
+
+```{r binary-alsi}
+print(results_bin$alsi)
+summary(results_bin$alsi$alpha)
+```
+
+Variance weights are 0.4345, 0.2979, and 0.2676 for Dimensions 1–3. ALSI
+values range from 0.040 to 1.625 (M = 0.373, Mdn = 0.368).
+
+## Category Projections
+
+```{r binary-projections}
+plot_category_projections(
+  results_bin$fit,
+  K         = results_bin$K,
+  alpha_vec = results_bin$alsi$alpha_vec,
+  top_n     = 10
+)
+```
+
+ADHD_1 carries the strongest projection (|p| = 2.07), followed by DYS_1,
+DEP_1, and PTSD_1.
+
+---
+
+# Example 2: Ordinal Data
+
+This example illustrates the `alsi_workflow_ordinal()` pipeline using the ten
+Extraversion items (E1–E10) from the Big Five Inventory (BFI; N = 500).
+
+## Data
+
+```{r ordinal-data}
+BFI            <- read.csv(system.file("extdata",
+                                        "BFI_Original_Ordinal_N500.csv",
+                                        package = "SEPA"))
+items          <- paste0("E", 1:10)
+reversed_items <- c("E2", "E4", "E6", "E8", "E10")
+head(BFI[, items])
+```
+
+```{r ordinal-freq}
+freq_table <- sapply(BFI[, items], function(x) table(factor(x, 1:5)))
+round(100 * freq_table / nrow(BFI), 1)
+```
+
+Response frequencies are well distributed across the 1–5 scale for all ten
+items, with no category falling below the 2% rare-category threshold.
+
+## Full Workflow Call
+
+```{r ordinal-workflow}
+results_ord <- alsi_workflow_ordinal(
+  data           = BFI,
+  items          = items,
+  reversed_items = reversed_items,
+  scale_min      = 1L,
+  scale_max      = 5L,
+  n_permutations = 100,
+  B_boot         = 1000,
+  seed           = 12345
+)
+```
+
+## Load and Inspect Precomputed Results
+
+```{r ordinal-load}
+results_ord <- readRDS(system.file("extdata", "results_ord.rds",
+                                    package = "SEPA"))
+```
+
+## Parallel Analysis
+
+```{r ordinal-pa}
+print(results_ord$pa_table)
+```
+
+The first four observed eigenvalues exceed their 95th-percentile reference
+values, supporting an initial K_PA = 4-dimensional solution.
+
+## Bootstrap Stability Diagnostics
+
+```{r ordinal-stability}
+print(results_ord$stability_table)
+plot_subspace_stability(results_ord)
+```
+
+Dimensions 1–3 satisfy both stability thresholds simultaneously. Dimension 4
+fails the angle criterion (median theta = 24.39° > 20°), yielding K* = 3.
+All 1,000 bootstrap resamples converged successfully (skipped = 0).
+
+## Ordinal ALSI Computation
+
+```{r ordinal-alsi}
+print(results_ord)
+cat("oALSI summary:\n")
+print(summary(results_ord$ALSI_index))
+cat("\noALSI (z-scored) summary:\n")
+print(summary(results_ord$ALSI_z))
+```
+
+Variance weights for K* = 3 are 0.4815, 0.3307, and 0.1878. The ordinal ALSI
+distribution is slightly negatively skewed, ranging from -0.014 to 0.025
+(Mdn = -0.001, M = 0.000).
+
+---
+
+# Example 3: Continuous Data
+
+This example illustrates the `calsi_workflow()` pipeline using N = 900
+individuals assessed on p = 9 domain scores from the WAIS-IV and WMS-IV
+cognitive batteries.
+
+## Data
+
+```{r continuous-data}
+wawm4   <- read.csv(system.file("extdata", "wawm4.csv", package = "SEPA"))
+domains <- c("VC", "PR", "WO", "PS", "IM", "DM", "VWM", "VM", "AM")
+X       <- wawm4[, domains]
+cat("N =", nrow(X), " p =", ncol(X), "\n")
+```
+
+Domain means ranged from approximately 99 to 101 and standard deviations from
+approximately 14 to 16, consistent with the standard score metric (normative
+M = 100, SD = 15). Row-mean-centering is applied internally by
+`calsi_workflow()`.
+
+## Full Workflow Call
+
+```{r continuous-workflow}
+results_cont <- calsi_workflow(
+  data       = X,
+  B_pa       = 2000,
+  B_boot     = 2000,
+  q          = 0.95,
+  seed       = 20260206,
+  K_override = 4
+)
+```
+
+## Load and Inspect Precomputed Results
+
+```{r continuous-load}
+results_cont <- readRDS(system.file("extdata", "results_cont.rds",
+                                     package = "SEPA"))
+```
+
+## Parallel Analysis
+
+```{r continuous-pa}
+print(results_cont$pa)
+```
+
+Horn's parallel analysis supported retention of four dimensions, accounting
+for approximately 78.28% of total variance in the row-mean-centered solution.
+
+## Bootstrap Stability Diagnostics
+
+```{r continuous-stability}
+print(results_cont$stability_table)
+plot_subspace_stability(results_cont)
+```
+
+All four dimensions satisfy both stability thresholds (median principal angles
+0.13°-10.37°, all < 20°; Tucker congruence 0.987-0.999, all >= 0.95),
+yielding K* = 4.
+
+## Continuous ALSI Computation and Domain Contributions
+
+```{r continuous-alsi}
+print(results_cont)
+print(results_cont$domain_contrib)
+```
+
+Variance weights for K* = 4 are 0.3833, 0.2481, 0.2222, and 0.1465. cALSI
+values range from 1.58 to 32.53 (M = 11.81, Mdn = 10.96, SD = 5.09).
+Processing Speed (PS, 21.5%) contributes most to the retained profile subspace.
+
+## Comparison with SEPA Plane-Wise Summaries
+
+```{r continuous-sepa}
+sepa_comparison <- compare_sepa_calsi(
+  fit = results_cont$boot$ref,
+  K   = 4
+)
+print(sepa_comparison)
+```
+
+The correlation between cALSI and the SEPA combined index was r = 0.988,
+indicating near-equivalent rank ordering of individuals across approaches.
+
+---
+
+# Session Information
+
+```{r session-info}
+sessionInfo()
+```

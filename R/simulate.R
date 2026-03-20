@@ -1,0 +1,112 @@
+## ============================================================
+## Synthetic WJ-IV look-alike data generator
+## ============================================================
+
+#' Simulate a synthetic Woodcock-Johnson IV look-alike dataset
+#'
+#' Generates a data frame that approximates the observed marginal distributions
+#' (means, SDs, and ranges) of the seven WJ-IV broad ability scores while
+#' respecting the qualitative level-elevation (LE) / pattern-elevation (PE)
+#' structure assumed by SEPA.  The data are produced from an additive model
+#' comprising a strong person-level elevation component (LE), a
+#' \eqn{K}-dimensional orthonormal pattern component (PE), and residual noise;
+#' columns are then linearly calibrated to the target statistics and clipped to
+#' the observed ranges.  Because the original norming data are proprietary,
+#' this function provides a fully reproducible, publicly shareable substitute.
+#'
+#' @param n        Integer. Number of simulated cases.  Default \code{5127}.
+#' @param domains  Character vector of length 7.  Domain abbreviations used as
+#'   column names.  Default \code{c("LT","ST","CP","AP","VP","CK","FR")}.
+#' @param seed     Integer random seed passed to \code{\link[base]{set.seed}}.
+#'   Default \code{20251127}.
+#' @param K        Integer. Number of orthogonal PE dimensions.  Must be 4.
+#' @param sigma_LE Numeric. Standard deviation of the level-elevation
+#'   component.  Default \code{sqrt(0.25)}.
+#' @param lambda   Numeric vector of length 4.  PE dimension variances.
+#'   Default \code{c(0.30, 0.18, 0.11, 0.06)}.
+#' @param sigma_eps Numeric. Residual noise SD.  Default \code{sqrt(0.10)}.
+#' @param target   Data frame with columns \code{domain}, \code{mean},
+#'   \code{sd}, \code{min}, \code{max} specifying the calibration targets for
+#'   each domain.  Defaults reproduce Table 2 of the associated paper.
+#' @param do_calibrate Logical. Linearly re-scale each column to match
+#'   \code{target} mean and SD.  Default \code{TRUE}.
+#' @param do_clip  Logical. Clip each column to \code{[target$min, target$max]}.
+#'   Default \code{TRUE}.
+#'
+#' @return A data frame with \code{n} rows and columns \code{ID},
+#'   \code{LT}, \code{ST}, \code{CP}, \code{AP}, \code{VP}, \code{CK},
+#'   \code{FR} (or as specified by \code{domains}).  Three attributes are
+#'   attached: \code{B_loadings} (the \eqn{p \times K} orthonormal loading
+#'   matrix), \code{lambda} (PE variances), and \code{sigma_LE}.
+#'
+#' @examples
+#' fake <- simulate_sepa_fake_wj(n = 200, seed = 1)
+#' dim(fake)           # 200 x 8
+#' colMeans(fake[, -1])
+#'
+#' @export
+simulate_sepa_fake_wj <- function(
+    n            = 5127L,
+    domains      = c("LT", "ST", "CP", "AP", "VP", "CK", "FR"),
+    seed         = 20251127L,
+    K            = 4L,
+    sigma_LE     = sqrt(0.25),
+    lambda       = c(0.30, 0.18, 0.11, 0.06),
+    sigma_eps    = sqrt(0.10),
+    target       = data.frame(
+      domain = c("LT",    "ST",    "CP",    "AP",    "VP",    "CK",    "FR"),
+      mean   = c(100.20,  100.93,   99.64,  101.01,  100.79,  100.92,   99.99),
+      sd     = c( 15.55,   15.72,   16.01,   15.61,   15.91,   15.75,   15.58),
+      min    = c( 37.04,   35.77,   12.26,   36.55,   31.76,   38.34,   32.74),
+      max    = c(148.37,  159.30,  150.00,  151.35,  160.44,  153.93,  148.04),
+      stringsAsFactors = FALSE
+    ),
+    do_calibrate = TRUE,
+    do_clip      = TRUE
+) {
+  stopifnot(
+    is.numeric(n),     n >= 1L,
+    length(domains) == 7L,
+    K == 4L,
+    length(lambda) == 4L
+  )
+  set.seed(seed)
+  p_loc <- length(domains)
+
+  ## 1a. Orthonormal loading matrix B (p x K)
+  B <- qr.Q(qr(matrix(stats::rnorm(p_loc * K), p_loc, K)))
+
+  ## 1b. Generate components: LE + PE + noise
+  mu_LE <- stats::rnorm(n, 0, sigma_LE)
+  LE    <- outer(mu_LE, rep(1, p_loc))
+  Z     <- matrix(stats::rnorm(n * K), n, K)
+  PE    <- Z %*% diag(sqrt(lambda), K, K) %*% t(B)
+  EPS   <- matrix(stats::rnorm(n * p_loc, 0, sigma_eps), n, p_loc)
+  X     <- LE + PE + EPS
+
+  ## 1c. Marginal calibration
+  colnames(X) <- domains
+  if (do_calibrate) {
+    for (j in seq_len(p_loc)) {
+      tj      <- target[target$domain == domains[j], ]
+      xj      <- (X[, j] - mean(X[, j])) / stats::sd(X[, j])
+      X[, j]  <- xj * tj$sd + tj$mean
+    }
+  }
+
+  ## 1d. Clip to observed range
+  if (do_clip) {
+    for (j in seq_len(p_loc)) {
+      tj      <- target[target$domain == domains[j], ]
+      X[, j]  <- pmin(pmax(X[, j], tj$min), tj$max)
+    }
+  }
+
+  out_df        <- as.data.frame(X)
+  out_df$ID     <- seq_len(n)
+  out_df        <- out_df[, c("ID", domains)]
+  attr(out_df, "B_loadings") <- B
+  attr(out_df, "lambda")     <- lambda
+  attr(out_df, "sigma_LE")   <- sigma_LE
+  out_df
+}
