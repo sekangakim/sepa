@@ -19,6 +19,8 @@ Description: Implements the Segment Profile Extraction via Pattern
   method is described in Kim and Grochowalski (2019)
   <doi:10.1007/s00357-018-9277-7>.
 License: MIT + file LICENSE
+URL: https://github.com/sekangakim/sepa, https://sekangakim.github.io/SEPA/
+BugReports: https://github.com/sekangakim/sepa/issues
 Encoding: UTF-8
 Language: en-US
 LazyData: true
