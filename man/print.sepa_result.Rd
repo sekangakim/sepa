@@ -11,6 +11,12 @@
 
 \item{...}{Ignored.}
 }
+\value{
+Invisibly returns \code{x}, the \code{sepa_result} object passed in.
+  Called primarily for its side effect of printing a compact summary to the
+  console, including sample size, number of domains, number of dimensions,
+  parallel-analysis significant dimensions, and marker domains.
+}
 \description{
 Print method for sepa_result objects
 }

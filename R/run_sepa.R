@@ -389,6 +389,10 @@ run_sepa <- function(data,
 #'
 #' @param x   A \code{sepa_result} object.
 #' @param ... Ignored.
+#' @return Invisibly returns \code{x}, the \code{sepa_result} object passed in.
+#'   Called primarily for its side effect of printing a compact summary to the
+#'   console, including sample size, number of domains, number of dimensions,
+#'   parallel-analysis significant dimensions, and marker domains.
 #' @export
 print.sepa_result <- function(x, ...) {
   cat("SEPA result\n")
